@@ -1,15 +1,45 @@
 import os
+import shutil
 from typing import Dict, Any
 
 from PIL import Image
 import pytesseract
+from pytesseract import TesseractNotFoundError
 from pdf2image import convert_from_path
 
-# Path to tesseract executable (you already set this correctly)
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+DEFAULT_WINDOWS_TESSERACT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+TESSERACT_CMD_ENV = "TESSERACT_CMD"
+DOCS_FOLDER = os.getenv(
+    "DOCS_FOLDER",
+    os.path.join(os.path.dirname(__file__), "documents-used"),
+)
 
-# Folder with your 5 documents
-DOCS_FOLDER = r"D:\PYTHON\3N mini hackathon\documents"
+
+def _configure_tesseract() -> None:
+    env_cmd = os.getenv(TESSERACT_CMD_ENV)
+    if env_cmd:
+        pytesseract.pytesseract.tesseract_cmd = env_cmd
+        return
+    if os.path.exists(DEFAULT_WINDOWS_TESSERACT):
+        pytesseract.pytesseract.tesseract_cmd = DEFAULT_WINDOWS_TESSERACT
+
+
+def _raise_tesseract_runtime_error() -> None:
+    configured_cmd = os.getenv(TESSERACT_CMD_ENV) or shutil.which("tesseract")
+    details = (
+        f" Current command/path: {configured_cmd}."
+        if configured_cmd
+        else " No Tesseract binary was detected on PATH."
+    )
+    raise RuntimeError(
+        "Tesseract OCR binary is required but was not found. "
+        "Install Tesseract on your system and ensure it is available on PATH, "
+        f"or set the {TESSERACT_CMD_ENV} environment variable to the executable path."
+        f"{details}"
+    )
+
+
+_configure_tesseract()
 
 
 # ---------- STEP 1: LOAD FILE + OCR ----------
@@ -23,13 +53,19 @@ def ocr_file(path: str) -> str:
     # For images
     if ext in [".png", ".jpg", ".jpeg", ".bmp", ".tiff"]:
         image = Image.open(path)
-        return pytesseract.image_to_string(image)
+        try:
+            return pytesseract.image_to_string(image)
+        except TesseractNotFoundError:
+            _raise_tesseract_runtime_error()
 
     # For PDFs → convert first page to image
     elif ext == ".pdf":
         pages = convert_from_path(path, first_page=1, last_page=1)  # only page 1
         image = pages[0]
-        return pytesseract.image_to_string(image)
+        try:
+            return pytesseract.image_to_string(image)
+        except TesseractNotFoundError:
+            _raise_tesseract_runtime_error()
 
     else:
         raise ValueError(f"Unsupported file type: {ext}")
@@ -351,14 +387,21 @@ def extract_fields(doc_type: str, text: str) -> Dict[str, Any]:
 
 # ---------- MAIN PIPELINE ----------
 
-def process_all_documents():
+def process_all_documents(docs_folder: str = DOCS_FOLDER):
     print("\n=== Starting Document Processing Pipeline ===")
-    print(f"Looking inside: {DOCS_FOLDER}\n")
+    print(f"Looking inside: {docs_folder}\n")
 
     results = []
 
-    for filename in os.listdir(DOCS_FOLDER):
-        path = os.path.join(DOCS_FOLDER, filename)
+    if not os.path.isdir(docs_folder):
+        print(
+            f"Document folder not found: {docs_folder}. "
+            "Set DOCS_FOLDER env var or pass a valid folder path."
+        )
+        return results
+
+    for filename in os.listdir(docs_folder):
+        path = os.path.join(docs_folder, filename)
 
         # Skip folders, just process actual files
         if not os.path.isfile(path):
@@ -394,4 +437,3 @@ def process_all_documents():
 
 if __name__ == "__main__":
     final_data = process_all_documents()
-
