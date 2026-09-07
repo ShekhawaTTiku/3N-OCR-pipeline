@@ -227,6 +227,7 @@ Users can:
 7. Review recent processing runs
 
 The Streamlit application directly reuses the processing functions from `main.py`.
+The `webApp/` folder is a separate Flask interface and is **not required** to run the Streamlit app.
 
 ### Run Streamlit
 
@@ -350,11 +351,7 @@ Use a recent Python 3 installation.
 Install the Python dependencies used by the project:
 
 ```bash
-pip install pillow
-pip install pytesseract
-pip install pdf2image
-pip install streamlit
-pip install flask
+pip install -r requirements.txt
 ```
 
 ---
@@ -362,22 +359,15 @@ pip install flask
 ## Tesseract OCR
 
 This project requires **Tesseract OCR** to be installed separately on the system.
+Python package installation alone is not enough; the `tesseract` system binary must also be installed.
 
-The current implementation points to:
+Configuration options:
 
-```text
-C:\Program Files\Tesseract-OCR\tesseract.exe
-```
+- Recommended: make `tesseract` available on your system `PATH`.
+- Optional: set `TESSERACT_CMD` to the absolute path of the `tesseract` executable.
+- Windows users can still use the default install location (`C:\Program Files\Tesseract-OCR\tesseract.exe`).
 
-inside `main.py`.
-
-If Tesseract is installed elsewhere, update:
-
-```python
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-```
-
-to match your local installation.
+On Streamlit Cloud, configure the system dependency in your deployment (for example through apt packages) and, if needed, set `TESSERACT_CMD` in app secrets/environment.
 
 ---
 
@@ -391,7 +381,7 @@ from pdf2image import convert_from_path
 
 The current implementation converts the **first page** of a PDF into an image and then sends that image to Tesseract.
 
-Depending on your Windows setup, `pdf2image` may also require **Poppler** to be installed and added to your system PATH.
+`pdf2image` also requires **Poppler** system utilities (`pdftoppm`) on the host machine. Ensure Poppler is installed and available on PATH (including Linux/Streamlit Cloud environments).
 
 ---
 
@@ -430,10 +420,9 @@ source venv/bin/activate
 Install the dependencies:
 
 ```bash
-pip install pillow pytesseract pdf2image streamlit flask
+pip install -r requirements.txt
 ```
-
-Install and configure Tesseract OCR, then make sure the executable path in `main.py` is correct.
+Install and configure Tesseract OCR on the host machine. If it is not on PATH, set `TESSERACT_CMD` to its absolute binary path.
 
 ---
 
